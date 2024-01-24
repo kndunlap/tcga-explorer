@@ -51,3 +51,110 @@ scatter("SLC7A5", "FOXM1", "BRCA")
 ```
 <img width="1324" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/4803d98f-4800-491b-81d1-d71e34883bee">
 
+# Function 2 - scatter_facet() - Makes scatter plots of 2 genes for all 36 cancer types.
+This function takes advantage of the facet_wrap() function in ggplot2. You will input two genes, and get 36 "mini-scatter plots", one for each cancer type.
+
+```
+scatter_facet <- function(gene1, gene2) {
+  library(ggpubr)
+  filtered_data <- all |>
+    select({{gene1}}, {{gene2}}, Type) 
+  
+  cor_value <- cor(filtered_data[[gene1]], filtered_data[[gene2]])
+  
+  ggplot(filtered_data, aes(x = !!sym(gene1), y = !!sym(gene2))) + 
+    geom_point(alpha = 0.5) +
+    facet_wrap(~Type) +
+    stat_cor(label.x.npc = .06,
+             label.y.npc = 1.0,
+             vjust = 1,
+             size = 3) +
+    geom_smooth(method = "lm")
+}
+```
+```
+scatter_facet("ASL", "ASS1")
+```
+<img width="1325" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/45616744-5ce1-4281-a0e6-122ad6229071">
+
+# Function 3 - single_cor() Gives you the correlation value of two genes.
+This function outputs a single number: The correlation value between two genes within one cancer type or across all of them.
+```
+single_cor <- function(Gene1, Gene2, code) {
+  all1 <- all |>
+  select({{Gene1}}, {{Gene2}}, Type) |>
+  filter(if (code != "TCGA") Type == code else TRUE) |>
+  summarize(
+    corvalue = cor({{Gene1}}, {{Gene2}})
+  )
+  return(all1)
+}
+```
+The below function call returns the correlation between ASL and ASS1 in SKCM (skin cancer melanoma)
+
+```
+single_cor(ASL, ASS1, "SKCM")
+```
+<img width="134" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/4f0a3419-88cd-47a7-b72f-56727685de26">
+
+And this call returns the correlation, taking all patients into account. This is done by making "TCGA" the third argument.
+```
+single_cor(ASL, ASS1, "TCGA")
+```
+<img width="135" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/257199de-4ce6-4585-a61e-3b036a78988c">
+
+# Function 4 - boxplot_many() - Give any number of genes and the TCGA type and get a single boxplot 
+This can be done pretty easily with XenaBrowser, but this method saves clicking time and improves the graphics. You can input any number of genes (greater than 1) and get a boxplot. As we've been doing, you can input either one cancer type or all of them with "TCGA".
+
+```
+boxplot_many <- function(code, ...) {
+  genes <- c(...)
+  all |>
+  select(genes, Type) |>
+  filter(if (code != "TCGA") Type == code else TRUE) |>
+  pivot_longer(
+    cols = (genes),
+    names_to = "Gene", 
+    values_to = "log2exp"
+  ) |>
+  ggplot(aes(x = reorder(Gene, log2exp), y = log2exp, fill = Gene)) + 
+  geom_boxplot(varwidth = TRUE) +
+  labs(title = code, x = "Gene List", y = "Log2 Expression") +
+  theme_minimal() +
+  theme(axis.line = element_line(linewidth = .5)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(legend.position = "none")
+}
+```
+```
+boxplot_many("TCGA", "OTC", "ASS1", "SLC7A5", "ARG1", "ARG2")
+```
+<img width="697" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/2353138c-eff0-4c2d-a899-ac5cc96b12fd">
+
+# Function 5 - boxplot_onegene() -  Give one gene and get a boxplot of all 36 cancer types.
+This plot takes one gene as an input and gives you a boxplot of 36 boxes, each corresponding to a cancer type. This is a good way to see what cancers your gene is highly or lowly expressed in.
+```
+boxplot_onegene <- function(Gene) {
+  all |>
+  select({{Gene}}, Type) |>
+  ggplot(aes(x = reorder(Type, {{Gene}}, FUN=median), y = {{Gene}}, fill = Type)) +
+           geom_boxplot() +
+  labs(x = "TCGA Code") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 8.2),
+    axis.text.y = element_text(size = 13),
+    axis.line = element_line(linewidth = .5),
+    legend.position = "none"
+    ) 
+}
+```
+```
+boxplot_onegene(ASS1)
+```
+<img width="1869" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/4c0efcc0-6b2c-4a71-871e-c2b59524f5f4">
+
+
+
+
+
