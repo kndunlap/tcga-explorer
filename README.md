@@ -1,3 +1,4 @@
+# Kyle note - need to unclean the "all" dataset to have their full code!! Or else can't join with metadata.
 # Introduction
 This repository is used to store information about TCGA datasets as well as code on how to mine through them.
 In this README, I will share with you six functions that will hopefully help you mine through TCGA data to get some useful results.
