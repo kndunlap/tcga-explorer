@@ -3,8 +3,8 @@
 library(UCSCXenaTools)
 library(tidyverse)
 
-all <- read.csv("TCGA_all_tidy_with_metadata.csv")
-all <- as.tibble(all)
+all <- read_csv("TCGA_all_tidy_with_metadata.csv")
+all <- all |> select(!1)
 
 # Import Files ------------------------------------------------------------
 # SKIP DOWN TO #1 - scatter IF YOU ALREADY HAVE THE TIDY FILE.
@@ -134,7 +134,7 @@ View(metadata)
 metadata <- metadata |>
   select(!samples) |>
   rename(patient = sample)
-  
+
 all <- all |>
   inner_join(metadata)
 
@@ -146,6 +146,11 @@ all |>
 # 1. scatter - Make a scatter plot of two genes with a specific cancer type --------
 
 scatter <- function(gene1, gene2, code) {
+  
+  gene1 <- ensym(gene1)
+  gene2 <- ensym(gene2)
+  code <- ensym(code)
+
   filtered_data <- all |>
     select({{gene1}}, {{gene2}}, Type, sample_type) |>
     filter(if (code != "TCGA") Type == code else TRUE) |>
@@ -156,7 +161,7 @@ scatter <- function(gene1, gene2, code) {
   
   cor_value <- cor(filtered_data[[gene1]], filtered_data[[gene2]])
   
-  ggplot(filtered_data, aes(x = !!sym(gene1), y = !!sym(gene2))) + 
+  ggplot(filtered_data, aes(x = {{gene1}}, y = {{gene2}})) + 
     geom_point(alpha = 0.2) +
     annotate("text", x = min(filtered_data[[gene1]]), y = max(filtered_data[[gene2]]),
              label = paste(code, "Correlation Coefficient: r =", round(cor_value, 3)),
@@ -169,12 +174,16 @@ scatter <- function(gene1, gene2, code) {
     theme(axis.title.y = element_text(size = 15)) 
 }
 
-scatter("SLC7A5", "FOXM1", "BRCA")
+scatter(ASS1, ASL, BRCA)
 
 
 # 2. scatter_facet - makes scatter plots of 2 genes for all 36 cancer types --------
 
 scatter_facet <- function(gene1, gene2) {
+  gene1 <- ensym(gene1)
+  gene2 <- ensym(gene2)
+  
+  
   library(ggpubr)
   filtered_data <- all |>
     select({{gene1}}, {{gene2}}, Type, sample_type) |>
@@ -183,24 +192,35 @@ scatter_facet <- function(gene1, gene2) {
     filter(sample_type != "Additional - New Primary") |>
     filter(sample_type != "Additional Metastatic")
   
-  cor_value <- cor(filtered_data[[gene1]], filtered_data[[gene2]])
+  cor_value <- filtered_data |>
+    group_by(Type) |>
+    summarize(
+      cor = cor({{gene1}}, {{gene2}})
+    )
   
-  ggplot(filtered_data, aes(x = !!sym(gene1), y = !!sym(gene2))) + 
-    geom_point(alpha = 0.5) +
+  plot <- ggplot(filtered_data, aes(x = {{gene1}}, y = {{gene2}})) + 
+    geom_point(alpha = 0.3) +
     facet_wrap(~Type) +
     stat_cor(label.x.npc = .06,
              label.y.npc = 1.0,
              vjust = 1,
              size = 3) +
     geom_smooth(method = "lm")
+    
+    cor_value |>
+      arrange(desc(cor)) |>
+      print(n = Inf)
+    
+    print(plot)
 }
-scatter_facet("SLC7A5", "FOXM1")
+scatter_facet(ASS1, SLC7A5)
 
 
 
 # 3. Gives you the correlation value of two genes within your desired cancer type (or all) -----
 
 single_cor <- function(Gene1, Gene2, code) {
+  code <- ensym(code)
   all1 <- all |>
     select({{Gene1}}, {{Gene2}}, Type, sample_type) |>
     filter(sample_type != "Solid Tissue Normal") |>
@@ -214,12 +234,14 @@ single_cor <- function(Gene1, Gene2, code) {
   return(all1)
 }
 
-single_cor(SLC7A5, FOXM1, "LUNG")
+single_cor(ASS1, ASL, TCGA)
 
 # 4. boxplot_many - Give any number of genes and the TCGA type and get a single boxplot -----------
 
 boxplot_many <- function(code, ...) {
-  genes <- c(...)
+  genes <- ensyms(...)
+  code <- ensym(code)
+  genes <- as.character(genes)
   all |>
     select(genes, Type, sample_type) |>
     filter(sample_type != "Solid Tissue Normal") |>
@@ -232,6 +254,7 @@ boxplot_many <- function(code, ...) {
       names_to = "Gene", 
       values_to = "log2exp"
     ) |>
+    mutate(Gene = factor(Gene, levels = genes)) |>
     ggplot(aes(x = Gene, y = log2exp, fill = Gene)) + 
     geom_boxplot() +
     labs(title = code) +
@@ -241,7 +264,7 @@ boxplot_many <- function(code, ...) {
     theme(legend.position = "none")
 }
 
-boxplot_many("TCGA", "OTC", "ASS1", "SLC7A5", "ARG1", "ARG2")
+boxplot_many(TCGA, OTC, ASS1, SLC7A5, ARG1, ARG2)
 
 # 5. boxplot_onegene -  One gene boxplot - all 36 cancer types ----------------------------------
 
@@ -267,15 +290,17 @@ boxplot_onegene(ASS1)
 # 6. onegene_corloop - Correlate over all genes giving one gene. (currently broken - need to fix the number of columns with additional metadata.) ---------
 
 onegene_corloop <- function(gene, code) {
+  code <- ensym(code)
   alltest <- all |>
-    select(!X) |>
-    select(!patient) |>
     filter(sample_type != "Solid Tissue Normal") |>
     filter(sample_type != "Recurrent Tumor") |>
     filter(sample_type != "Additional - New Primary") |>
     filter(sample_type != "Additional Metastatic") |>
+    select(!20533:20571) |>
+    select(!patient) |>
     filter(if (code != "TCGA") Type == code else TRUE) |>
     relocate({{gene}}, .after = Type)
+  
   alllist <- lapply(c(2:ncol(alltest)), function(x) cor(alltest[,2], alltest[,x], method = "pearson", use = "complete.obs"))
   listframe <- data.frame(alllist)
   listframe |>
@@ -284,33 +309,36 @@ onegene_corloop <- function(gene, code) {
       names_to = "gene",
       values_to = "cor"
     ) |>
-    arrange(desc(cor))
+    arrange(desc(cor)) |>
+    print(n = 25)
+  
 }
 
-SLC7A5cor <- onegene_corloop(SLC7A5, "COAD") 
+onegene_corloop(SLC7A5, TCGA) 
 
 
 # 7. normal_cancer - Create a Boxplot of Solid Tissue vs. Cancer in Your Type --------
 
 normal_cancer <- function(Gene, code){
+  code <- ensym(code)
   title1 <- paste0("Comparison of ", code, " to nearby Non-Cancerous Tissue")
   all |>
-  filter(sample_type != "Additional - New Primary") |>
-  filter(sample_type != "Additional Metastatic") |>
-  filter(sample_type != "Recurrent Tumor") |>
-  select({{Gene}}, Type, sample_type) |>
-  filter(if (code != "TCGA") Type == code else TRUE) |>
-  ggplot(aes(x = sample_type, y = {{Gene}}, fill = sample_type)) + 
-  geom_boxplot() +
-  labs(title = title1) +
-  theme_minimal() +
-  theme(axis.line = element_line(linewidth = .5)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(size = 8.5)) +
-  theme(legend.position = "none")
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    select({{Gene}}, Type, sample_type) |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    ggplot(aes(x = sample_type, y = {{Gene}}, fill = sample_type)) + 
+    geom_boxplot() +
+    labs(title = title1) +
+    theme_minimal() +
+    theme(axis.line = element_line(linewidth = .5)) +
+    theme(axis.text = element_text(size = 12)) +
+    theme(axis.text.x = element_text(size = 8.5)) +
+    theme(legend.position = "none")
   
 }
-normal_cancer(ASS1, "TCGA")
+normal_cancer(BRCA1, BRCA)
 
 
 
@@ -338,3 +366,12 @@ all |>
   ) |>
   arrange(desc(mean)) |>
   print(n = Inf)
+
+all |>
+  select(BRCA1, sample_type, Type) |>
+  filter(Type == "BRCA") |>
+  group_by(sample_type) |>
+  summarize(
+    mean = mean(BRCA1)
+  )
+
