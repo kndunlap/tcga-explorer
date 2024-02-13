@@ -341,6 +341,35 @@ normal_cancer <- function(Gene, code){
 normal_cancer(BRCA1, BRCA)
 
 
+# 8. rank - Ranks cancer types by expression of given gene --------------
+
+rank <- function(gene) {
+  gene <- ensym(gene)
+  all |>
+  select({{gene}}, Type) |>
+  group_by(Type) |>
+  summarize(
+    mean = mean({{gene}}, na.rm = TRUE) 
+  ) |>
+  arrange(desc(mean)) |>
+  print(n = Inf)
+}
+rank(OTC)
+
+
+# Messing Around ----------------------------------------------------------
+
+
+all |>
+  select(BRCA1, sample_type, Type) |>
+  filter(Type == "BRCA") |>
+  group_by(sample_type) |>
+  summarize(
+    mean = mean(BRCA1)
+  ) |>
+  ggplot(aes(x = sample_type, y = mean, fill = sample_type)) +
+  geom_col()
+
 
 ### genelist ###
 genelist <- read.csv("genelist.csv", skip = 2)
@@ -354,26 +383,4 @@ SLC7A5cor |>
   filter(gene %in% genevec) |>
   View()
 
-
-# Messing Around ----------------------------------------------------------
-
-# ranks cancer types by expression of the gene
-all |>
-  select(OTC, Type) |>
-  group_by(Type) |>
-  summarize(
-    mean = mean(OTC, na.rm = TRUE) 
-  ) |>
-  arrange(desc(mean)) |>
-  print(n = Inf)
-
-all |>
-  select(BRCA1, sample_type, Type) |>
-  filter(Type == "BRCA") |>
-  group_by(sample_type) |>
-  summarize(
-    mean = mean(BRCA1)
-  ) |>
-  ggplot(aes(x = sample_type, y = mean, fill = sample_type)) +
-  geom_col()
 
