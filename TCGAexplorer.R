@@ -287,7 +287,7 @@ boxplot_onegene <- function(Gene) {
 boxplot_onegene(ASS1)
 
 
-# 6. onegene_corloop - Correlate over all genes giving one gene. (currently broken - need to fix the number of columns with additional metadata.) ---------
+# 6. onegene_corloop - Correlate over all genes giving one gene. (Fixed) ---------
 
 onegene_corloop <- function(gene, code) {
   code <- ensym(code)
@@ -373,5 +373,7 @@ all |>
   group_by(sample_type) |>
   summarize(
     mean = mean(BRCA1)
-  )
+  ) |>
+  ggplot(aes(x = sample_type, y = mean, fill = sample_type)) +
+  geom_col()
 
