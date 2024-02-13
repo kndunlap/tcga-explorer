@@ -1,4 +1,3 @@
-# Kyle note - need to unclean the "all" dataset to have their full code!! Or else can't join with metadata.
 # Introduction
 This repository is used to store information about TCGA datasets as well as code on how to mine through them.
 In this README, I will share with you six functions that will hopefully help you mine through TCGA data to get some useful results.
@@ -52,7 +51,7 @@ scatter("SLC7A5", "FOXM1", "BRCA")
 ```
 <img width="1324" alt="image" src="https://github.com/kndunlap/tcga-explorer/assets/61035909/4803d98f-4800-491b-81d1-d71e34883bee">
 
-# Function 2 - scatter_facet() - Makes scatter plots of 2 genes for all 36 cancer types.
+# Function 2 - scatter_facet() - This one makes scatter plots of 2 genes for all 36 cancer types.
 This function takes advantage of the facet_wrap() function in ggplot2. You will input two genes, and get 36 "mini-scatter plots", one for each cancer type.
 
 ```
