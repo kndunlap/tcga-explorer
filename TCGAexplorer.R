@@ -383,4 +383,7 @@ SLC7A5cor |>
   filter(gene %in% genevec) |>
   View()
 
-
+all |>
+  count(Type) |>
+  arrange(desc(n)) |>
+  print(n = Inf)
