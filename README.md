@@ -5,7 +5,7 @@ Kyle Dunlap
 
 ## Introduction
 
-Welcome to TCGA Explorer!
+We’ve made some changes here.
 
 ``` r
 summary(cars)
