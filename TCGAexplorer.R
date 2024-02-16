@@ -277,11 +277,11 @@ boxplot_onegene <- function(Gene) {
     filter(sample_type != "Additional Metastatic") |>
     ggplot(aes(x = reorder(Type, {{Gene}}, FUN=median), y = {{Gene}}, fill = Type)) +
     geom_boxplot() +
-    theme(axis.text = element_text(size = 8.25)) +
     labs(x = "TCGA Code") +
     theme_minimal() +
-    theme(axis.line = element_line(linewidth = .5)) +
-    theme(legend.position = "none") 
+    theme(axis.line = element_line(linewidth = .5), 
+          axis.text.x = element_text(size = 9, angle = 45, hjust = 1, face = "bold"),
+          legend.position = "none")
 }
 
 boxplot_onegene(ASS1)

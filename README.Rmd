@@ -9,7 +9,7 @@ output: github_document
 
 This repository is used to store information about TCGA datasets as well as code on how to mine through them.
 In this README, I will share with you several functions that will hopefully help you mine through TCGA data to get some useful results.
-These functions use a dataset compiled from the PANCANCER subset in Xenabrowser. If you want to see how I cleaned and put this dataset together, please check out the code in this repository. This pre-cleaned dataset is stored on the University of Utah Biochemistry Fileserver. It is comprised of 12,724 patients, 20,532 genes, and 2 columns at the beginning indicating the TCGA cancer code (https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations) and the abbreviated patient ID. Below is the code used to very quickly do a final clean on this sheet, and what the output looks like.
+These functions use a dataset compiled from the PANCANCER subset in Xenabrowser. If you want to see how I cleaned and put this dataset together, please check out the code in this repository. This pre-cleaned dataset is stored on the University of Utah Biochemistry Fileserver. It is comprised of 12,724 patients, 20,532 genes, and 2 columns at the beginning indicating the TCGA cancer code (https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations) and the abbreviated patient ID. Below is the code used to load in data, and what the first six rows of the table looks like.
 
 ```{r load in data, cache = TRUE, message = FALSE}
 library(tidyverse)
@@ -61,7 +61,7 @@ scatter <- function(gene1, gene2, code) {
 ```
 Running this function gives the output below.
 
-```{r function 1 result, message = FALSE, dpi = 300}
+```{r function 1 result, message = FALSE, out.width = "75%", out.height = "75%", dpi = 300}
 scatter(PHGDH, PSAT1, TCGA)
 ```
 
@@ -108,4 +108,169 @@ Running this function gives the output below.
 
 ```{r function 2 result, message = FALSE, fig.width = 9, fig.height= 8.5, dpi = 300}
 scatter_facet(PHGDH, PSAT1)
+```
+
+# Function 3 - single_cor() Gives you the correlation value of two genes.
+This function outputs a single number: The correlation value between two genes within one cancer type or across all of them.
+```{r function 3}
+single_cor <- function(Gene1, Gene2, code) {
+  code <- ensym(code)
+  all1 <- all |>
+    select({{Gene1}}, {{Gene2}}, Type, sample_type) |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    summarize(
+      corvalue = cor({{Gene1}}, {{Gene2}})
+    )
+  return(all1)
+}
+```
+Running this code will give you your single value, in this case, the correlation between PSAT1 and PHGDH over all cancer types is 0.476
+```{r function 3 result, message = FALSE}
+single_cor(PSAT1, PHGDH, TCGA)
+```
+
+# Function 4 - boxplot_many() - Give any number of genes and the TCGA type and get a single boxplot 
+This can be done pretty easily with XenaBrowser, but this method saves clicking time and improves the graphics. You can input any number of genes (greater than 1) and get a boxplot. As we've been doing, you can input either one cancer type or all of them with "TCGA".
+
+```{r function 4}
+boxplot_many <- function(code, ...) {
+  genes <- ensyms(...)
+  code <- ensym(code)
+  genes <- as.character(genes)
+  all |>
+    select(genes, Type, sample_type) |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    pivot_longer(
+      cols = (genes),
+      names_to = "Gene", 
+      values_to = "log2exp"
+    ) |>
+    mutate(Gene = factor(Gene, levels = genes)) |>
+    ggplot(aes(x = Gene, y = log2exp, fill = Gene)) + 
+    geom_boxplot() +
+    labs(title = code) +
+    theme_minimal() +
+    theme(axis.line = element_line(linewidth = .5)) +
+    theme(axis.text = element_text(size = 12)) +
+    theme(legend.position = "none")
+}
+```
+Running this code with any number of genes will give you the boxplot below. The cancer type (or TCGA) must be in the first argument.
+``` {r function 4 result, dpi = 300}
+boxplot_many(TCGA, OTC, ASS1, SLC7A5, ARG1, ARG2)
+```
+
+# Function 5 - boxplot_onegene() -  Give one gene and get a boxplot of all 36 cancer types.
+This plot takes one gene as an input and gives you a boxplot of 36 boxes, each corresponding to a cancer type. This is a good way to see what cancers your gene is highly or lowly expressed in.
+```{r function 5}
+boxplot_onegene <- function(Gene) {
+  all |>
+    select({{Gene}}, Type, sample_type) |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    ggplot(aes(x = reorder(Type, {{Gene}}, FUN=median), y = {{Gene}}, fill = Type)) +
+    geom_boxplot() +
+    labs(x = "TCGA Code") +
+    theme_minimal() +
+    theme(axis.line = element_line(linewidth = .5), 
+          axis.text.x = element_text(size = 9, angle = 45, hjust = 1, face = "bold"),
+          legend.position = "none")
+}
+```
+Here, you input one gene to get the boxplot.
+``` {r function 5 result, dpi = 300}
+boxplot_onegene(PHGDH)
+```
+
+# Function 6 - onegene_corloop() - Correlate over all genes after giving one gene.
+This function takes one gene as an input and returns a table of the most correlated gene to the input gene. Like previous functions, you can choose what cancer type to look at. This is a good way to see what genes may have some sort of co-regulation with the input gene.
+``` {r function 6}
+onegene_corloop <- function(gene, code) {
+  code <- ensym(code)
+  alltest <- all |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    select(!20533:20571) |>
+    select(!patient) |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    relocate({{gene}}, .after = Type)
+  
+  alllist <- lapply(c(2:ncol(alltest)), function(x) cor(alltest[,2], alltest[,x], method = "pearson", use = "complete.obs"))
+  listframe <- data.frame(alllist)
+  listframe |>
+    pivot_longer(
+      cols = 1:ncol(listframe),
+      names_to = "gene",
+      values_to = "cor"
+    ) |>
+    arrange(desc(cor)) |>
+    print(n = 5)
+  
+}
+```
+Give the input gene and cancer code. You can print as many genes as you want, but I will only show 5.
+
+```{r function 6 result, message = FALSE, warning = FALSE}
+onegene_corloop(PHGDH, TCGA) 
+```
+
+# 7. normal_cancer - Create a Boxplot of Solid Tissue vs. Cancer in Your Type
+What's cool about this dataset is that there is also tissue next to the diseased area that we have access to. Here, you can plot the values of a gene in a cancer tissue vs. the healthy tissue nearby.
+
+```{r function 7}
+normal_cancer <- function(Gene, code){
+  code <- ensym(code)
+  title1 <- paste0("Comparison of ", code, " to nearby Non-Cancerous Tissue")
+  all |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    select({{Gene}}, Type, sample_type) |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    ggplot(aes(x = sample_type, y = {{Gene}}, fill = sample_type)) + 
+    geom_boxplot() +
+    labs(title = title1) +
+    theme_minimal() +
+    theme(axis.line = element_line(linewidth = .5)) +
+    theme(axis.text = element_text(size = 12)) +
+    theme(axis.text.x = element_text(size = 8.5)) +
+    theme(legend.position = "none")
+}
+```
+
+Give a gene and a cancer type to get a boxplot.
+```{r function 7 result}
+normal_cancer(PHGDH, BRCA)
+```
+
+# 8. rank - Ranks cancer types by expression of given gene
+This function will take one gene and rank its expression within the 36 available cancer types in TCGA.
+```{r function 8}
+rank <- function(gene) {
+  gene <- ensym(gene)
+  all |>
+  select({{gene}}, Type) |>
+  group_by(Type) |>
+  summarize(
+    mean = mean({{gene}}, na.rm = TRUE) 
+  ) |>
+  arrange(desc(mean)) |>
+  print(n = 5)
+}
+```
+Input one gene. You will only see the top 5 results.
+```{r function 8 result}
+rank(PHGDH)
 ```
