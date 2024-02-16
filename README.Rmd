@@ -5,26 +5,107 @@ date: "2024-02-16"
 output: github_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## Introduction
+
+This repository is used to store information about TCGA datasets as well as code on how to mine through them.
+In this README, I will share with you several functions that will hopefully help you mine through TCGA data to get some useful results.
+These functions use a dataset compiled from the PANCANCER subset in Xenabrowser. If you want to see how I cleaned and put this dataset together, please check out the code in this repository. This pre-cleaned dataset is stored on the University of Utah Biochemistry Fileserver. It is comprised of 12,724 patients, 20,532 genes, and 2 columns at the beginning indicating the TCGA cancer code (https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations) and the abbreviated patient ID. Below is the code used to very quickly do a final clean on this sheet, and what the output looks like.
+
+```{r load in data, cache = TRUE, message = FALSE}
+library(tidyverse)
+load("all.RData")
+
 ```
 
-## R Markdown 
+```{r make head, echo = FALSE, message = FALSE}
+library(tidyverse)
+all <- all2
+head(all)
+```
+This dataset is named "all" and will be the main input for all of the following functions.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Function 1 - scatter() - Makes a scatterplot of two genes.
 
-```{r cars}
-summary(cars)
+To use this function, you input two genes and then the cancer type (ACC, BLCA, LIHC) for example. If you want to make a large plot utilizing all 36 cancer types, you will plug in "TCGA" as the third argument.
+
+``` {r function 1, cache = TRUE}
+scatter <- function(gene1, gene2, code) {
+  
+  gene1 <- ensym(gene1)
+  gene2 <- ensym(gene2)
+  code <- ensym(code)
+
+  filtered_data <- all |>
+    select({{gene1}}, {{gene2}}, Type, sample_type) |>
+    filter(if (code != "TCGA") Type == code else TRUE) |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic")
+  
+  cor_value <- cor(filtered_data[[gene1]], filtered_data[[gene2]])
+  
+  ggplot(filtered_data, aes(x = {{gene1}}, y = {{gene2}})) + 
+    geom_point(alpha = 0.2) +
+    annotate("text", x = min(filtered_data[[gene1]]), y = max(filtered_data[[gene2]]),
+             label = paste(code, "Correlation Coefficient: r =", round(cor_value, 3)),
+             hjust = 0, vjust = 0, size = 5.5) +
+    geom_smooth(method = "lm") +
+    theme_classic() +
+    theme(axis.text.x = element_text(size = 15)) +
+    theme(axis.text.y = element_text(size = 15)) +
+    theme(axis.title.x = element_text(size = 15)) +
+    theme(axis.title.y = element_text(size = 15)) 
+}
+```
+Running this function gives the output below.
+
+```{r function 1 result, message = FALSE, dpi = 300}
+scatter(PHGDH, PSAT1, TCGA)
 ```
 
-## Including Plots
+# Function 2 - scatter_facet() - Makes scatter plots of 2 genes for all 36 cancer types.
+This function takes advantage of the facet_wrap() function in ggplot2. You will input two genes, and get 36 "mini-scatter plots", one for each cancer type. It will return both a table and a plot. To save space, I only show a tiny snippet of the plot, but you can see the whole thing by changing print(n = 3) to print(n = Inf).
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r function 2}
+scatter_facet <- function(gene1, gene2) {
+  gene1 <- ensym(gene1)
+  gene2 <- ensym(gene2)
+  
+  
+  library(ggpubr)
+  filtered_data <- all |>
+    select({{gene1}}, {{gene2}}, Type, sample_type) |>
+    filter(sample_type != "Solid Tissue Normal") |>
+    filter(sample_type != "Recurrent Tumor") |>
+    filter(sample_type != "Additional - New Primary") |>
+    filter(sample_type != "Additional Metastatic")
+  
+  cor_value <- filtered_data |>
+    group_by(Type) |>
+    summarize(
+      cor = cor({{gene1}}, {{gene2}})
+    )
+  
+  plot <- ggplot(filtered_data, aes(x = {{gene1}}, y = {{gene2}})) + 
+    geom_point(alpha = 0.3) +
+    facet_wrap(~Type) +
+    stat_cor(label.x.npc = .06,
+             label.y.npc = 1.0,
+             vjust = 1,
+             size = 3) +
+    geom_smooth(method = "lm")
+    
+    cor_value |>
+      arrange(desc(cor)) |>
+      print(n = 3)
+    
+    print(plot)
+}
 ```
+Running this function gives the output below.
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r function 2 result, message = FALSE, fig.width = 9, fig.height= 8.5, dpi = 300}
+scatter_facet(PHGDH, PSAT1)
+```
