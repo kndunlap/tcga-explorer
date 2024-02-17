@@ -387,3 +387,32 @@ all |>
   count(Type) |>
   arrange(desc(n)) |>
   print(n = Inf)
+
+
+
+alltest <- all |>
+  filter(sample_type != "Solid Tissue Normal") |>
+  filter(sample_type != "Recurrent Tumor") |>
+  filter(sample_type != "Additional - New Primary") |>
+  filter(sample_type != "Additional Metastatic") |>
+  select(!20533:20571) |>
+  select(!patient) |>
+  relocate(SLC7A5, .after = Type)
+
+alltest <- alltest[1:7]
+
+for (i in 2:ncol(alltest)) {            
+  output <- cor(alltest[,2], alltest[,i])
+}
+
+
+alllist <- lapply(c(2:ncol(alltest)), function(x) cor(alltest[,2], alltest[,x], method = "pearson", use = "complete.obs"))
+listframe <- data.frame(alllist)
+listframe |>
+  pivot_longer(
+    cols = 1:ncol(listframe),
+    names_to = "gene",
+    values_to = "cor"
+  ) |>
+  arrange(desc(cor)) |>
+  print(n = 25)
