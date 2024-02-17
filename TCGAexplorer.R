@@ -287,7 +287,7 @@ boxplot_onegene <- function(Gene) {
 boxplot_onegene(ASS1)
 
 
-# 6. onegene_corloop - Correlate over all genes giving one gene. (Fixed) ---------
+# 6. onegene_corloop - Correlate over all genes giving one gene.  ---------
 
 onegene_corloop <- function(gene, code) {
   code <- ensym(code)
@@ -301,8 +301,13 @@ onegene_corloop <- function(gene, code) {
     filter(if (code != "TCGA") Type == code else TRUE) |>
     relocate({{gene}}, .after = Type)
   
-  alllist <- lapply(c(2:ncol(alltest)), function(x) cor(alltest[,2], alltest[,x], method = "pearson", use = "complete.obs"))
-  listframe <- data.frame(alllist)
+  output <- list()
+  for (i in c(2:ncol(alltest))) {            
+    output[[i]] <- cor(alltest[,2], alltest[,i])
+  }
+  output <- output[-1]
+  
+  listframe <- data.frame(output)
   listframe |>
     pivot_longer(
       cols = 1:ncol(listframe),
@@ -390,29 +395,3 @@ all |>
 
 
 
-alltest <- all |>
-  filter(sample_type != "Solid Tissue Normal") |>
-  filter(sample_type != "Recurrent Tumor") |>
-  filter(sample_type != "Additional - New Primary") |>
-  filter(sample_type != "Additional Metastatic") |>
-  select(!20533:20571) |>
-  select(!patient) |>
-  relocate(SLC7A5, .after = Type)
-
-alltest <- alltest[1:7]
-
-for (i in 2:ncol(alltest)) {            
-  output <- cor(alltest[,2], alltest[,i])
-}
-
-
-alllist <- lapply(c(2:ncol(alltest)), function(x) cor(alltest[,2], alltest[,x], method = "pearson", use = "complete.obs"))
-listframe <- data.frame(alllist)
-listframe |>
-  pivot_longer(
-    cols = 1:ncol(listframe),
-    names_to = "gene",
-    values_to = "cor"
-  ) |>
-  arrange(desc(cor)) |>
-  print(n = 25)
