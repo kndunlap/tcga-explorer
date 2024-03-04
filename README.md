@@ -18,9 +18,16 @@ genes, and 2 columns at the beginning indicating the TCGA cancer code
 and the abbreviated patient ID. Below is the code used to load in data,
 and what the first six rows of the table looks like.
 
+To access the data, please download from this link.
+
+https://drive.google.com/file/d/1LzjOF6AJxkDOs8mn0xr_jeHAYgo8fpoC/view?usp=drive_link
+
+Then, run the below code to initialize the dataset. Substitute "filename" with whatever you named the file when you downloaded it.
+
 ``` r
 library(tidyverse)
-load("all.RData")
+all <- read_csv("filename")
+all <- all |> select(!1)
 ```
 
     ## # A tibble: 6 × 20,571
